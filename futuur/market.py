@@ -3,21 +3,30 @@ from .futuur_api import FutuurAPI
 from urllib.parse import urlparse, parse_qs
 
 
-class Market(FutuurAPI):
+class FutuurMarket(FutuurAPI):
     """
-    A class for interacting with the Futuur Market.
+    A class for interacting with the Futuur Market API to fetch and manage market data.
+
+    This class inherits from FutuurAPI and provides methods specifically tailored to interacting
+    with market-related endpoints of the Futuur API.
 
     Attributes:
-        PUBLIC_KEY (str): The public API key for authentication.
-        PRIVATE_KEY (str): The private API key for authentication.
-        base_url (str): The base URL for the API endpoints.
+        PUBLIC_KEY (str): The public API key for authentication, obtained from settings.
+        PRIVATE_KEY (str): The private API key for authentication, obtained from settings.
+        base_url (str): The base URL for the API endpoints, inherited from FutuurAPI.
+        currency_mode (str): Determines the currency mode for market data queries ('play_money' or 'real_money').
+        ordering (str): Specifies the ordering of market data results (e.g., 'relevance').
+        hide_my_bets (bool): Flag to hide the user's bets in the query results.
+        market_request (dict): The initial market data fetched from the API.
+        pagination (dict): Contains pagination information for fetching additional market data.
+        markets (list): A list of market entries fetched from the API.
 
     Methods:
-        __init__(): Initializes the FutuurAPI instance.
-        build_signature(params: dict) -> dict: Builds the HMAC signature for the API request.
-        build_headers(params: dict) -> dict: Builds the headers for the API request.
-        call_api(endpoint: str, params: dict) -> dict: Makes a GET request to the API endpoint.
+        __init__(currency_mode="play_money", ordering="relevance", hide_my_bets=True):
+            Initializes a new instance of the FutuurMarket class with default or specified settings.
 
+        add_markets():
+            Fetches additional markets based on the current pagination state and adds them to the instance's market list
     """
 
     def __init__(self, currency_mode="play_money", ordering="relevance",  hide_my_bets=True):
@@ -46,7 +55,11 @@ class Market(FutuurAPI):
 
     def add_markets(self):
         """
-            Add more markets from the Futuur API into the instance.
+        Fetches additional markets from the Futuur API based on the current pagination state and appends them to the
+        instance's markets list.
+
+        This method dynamically constructs the query parameters for the API request from the pagination information of
+        the last fetched data. It updates the instance's market list and pagination info with the newly fetched data.
         """
         parsed_url = urlparse(self.pagination.get('next'))
         query_string = parsed_url.query
