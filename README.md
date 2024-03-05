@@ -21,3 +21,17 @@ Installing:
     pip install -r requirements.txt
 
 2. Make a **.env** file from **.env.example** and set basic variables. Remove or comment other variables.
+
+# Project structure
+
+## /futuur
+
+Holds the service that is responsible for interacting with the Futuur API.
+
+## /manifold
+
+Holds the service that is responsible for interacting with the Manifold API.
+
+## /abitrage
+
+Has a proof of concept script that interacts with the API services. As a first step the matching bets will be hardcoded or manually saved on a file. In the future there can be a discovery service responsible for browsing the different markets and finding matching bets
