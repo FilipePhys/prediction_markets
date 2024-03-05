@@ -1,4 +1,4 @@
-import settings
+import settings as settings
 from .futuur_api import FutuurAPI
 from urllib.parse import urlparse, parse_qs
 

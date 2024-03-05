@@ -32,6 +32,6 @@ Holds the service that is responsible for interacting with the Futuur API.
 
 Holds the service that is responsible for interacting with the Manifold API.
 
-## /abitrage
+## /analysis
 
 Has a proof of concept script that interacts with the API services. As a first step the matching bets will be hardcoded or manually saved on a file. In the future there can be a discovery service responsible for browsing the different markets and finding matching bets

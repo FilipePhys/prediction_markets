@@ -40,17 +40,27 @@ class ManifoldAPI:
             return response
         
 
-    def get_market(self, market_id=43598):
+    def get_market_by_id(self, market_id="CBzyMJCDvhxzPrtmtIYV") -> dict:
         """
-        Fetches the details of a specific market on the Futuur platform.
+        Fetches the details of a specific market on the Manifold platform.
 
         Args:
-            market_id (int): The ID of the market to fetch.
+            market_id (str): The ID of the market to fetch.
 
         Returns:
             dict: A dictionary containing the details of the specified market.
-
-        Notes:
-            - Authorization via HMAC is required to access this API endpoint.
         """
         return self.call_api(f'market/{market_id}/', method='GET')
+    
+
+    def get_market_by_slug(self, slug="which-party-will-win-the-2024-us-pr-f4158bf9278a") -> dict:
+        """
+        Fetches the details of a specific market on the Manifold platform.
+
+        Args:
+            slug (str): The slug of the market to fetch.
+
+        Returns:
+            dict: A dictionary containing the details of the specified market.
+        """
+        return self.call_api(f'slug/{slug}/', method='GET')
