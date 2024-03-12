@@ -19,7 +19,11 @@ def analyze():
 
     futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
 
-    markets = futuur_api.get_all_markets()
+    #markets = futuur_api.get_all_markets()
+
+    # we have both markets stored as json data. Now we can have hugging_face try to match
+
+    analyzer.sim()
 
                 
 

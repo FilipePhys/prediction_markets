@@ -1,11 +1,15 @@
 
 
+import json
 from typing import List
 from dataclasses import dataclass, field
 
 import settings
 from futuur.futuur_api import FutuurAPI
 from manifold.manifold_api import ManifoldAPI
+from transformers import BertTokenizer, BertModel
+import torch
+from scipy.spatial.distance import cosine
 
 @dataclass
 class MatchingOutcome:
@@ -75,5 +79,44 @@ class Analizer:
     def retrieve_matching_markets(self):
         #TODO implement hugging_face semantic analyzer or something to try and identify matches. Maybe dump matches in a txt or something
         pass
+
+    def sim(self):
+            # Carregar o modelo BERT pré-treinado
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        model = BertModel.from_pretrained('bert-base-uncased')
+        
+        with open('futuur_data.json', 'r') as json_file:
+            futuur_json = json.load(json_file)
+
+        with open('mani_data.json', 'r') as json_file:
+            mani_json = json.load(json_file)
+
+        first = futuur_json[0]
+        print(first.get('title'))
+        
+        def get_bert_embedding(sentence):
+            inputs = tokenizer(sentence, return_tensors='pt', padding=True, truncation=True)
+            outputs = model(**inputs)
+            last_hidden_state = outputs.last_hidden_state
+            return torch.mean(last_hidden_state, dim=1).squeeze().detach().numpy()
+
+        # Função para calcular a similaridade entre duas frases usando embeddings BERT
+        def sentence_similarity(sentence1, sentence2):
+            embedding1 = get_bert_embedding(sentence1)
+            embedding2 = get_bert_embedding(sentence2)
+            return 1 - cosine(embedding1, embedding2)
+        
+
+        for market in mani_json[0:10]:
+        
+
+        # Função para obter embeddings de uma frase usando BERT
+
+
+            # Exemplo de uso
+            sentence1 = first.get('title')
+            sentence2 = market.get('question')
+            similarity_score = sentence_similarity(sentence1, sentence2)
+            print(sentence2, similarity_score)
 
     
