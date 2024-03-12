@@ -17,7 +17,9 @@ def analyze():
 
     manifold_api = ManifoldAPI()
 
-    markets = manifold_api.get_all_markets()
+    futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
+
+    markets = futuur_api.get_all_markets()
 
                 
 

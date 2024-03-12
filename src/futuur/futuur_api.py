@@ -2,6 +2,9 @@ import datetime
 import hashlib
 import hmac
 from collections import OrderedDict
+import json
+import time
+from typing import List
 from urllib.parse import urlencode
 
 import requests
@@ -339,3 +342,26 @@ class FutuurAPI:
             - Authorization via HMAC is required to access this API endpoint.
         """
         return self.call_api('bets/rates/', method='GET')
+    
+    def get_all_markets(self):
+        #params = {'offset': offset}
+        response = self.get_markets()
+
+        results: List = response.get('results')
+        offset = response.get('pagination').get('page_size')
+
+        next = response.get('pagination').get('next')
+        while next:
+            response = self.get_markets(offset=offset)
+            results.extend(response.get('results'))
+
+            next = response.get('pagination').get('next')
+            offset += response.get('pagination').get('page_size')
+            time.sleep(1)
+            print(response.get('pagination'))
+            print(results[-1].get('id'))
+        
+        with open('futuur_data.json', 'w', encoding='utf-8') as f:
+            json.dump(results, f, ensure_ascii=False, indent=4)
+        return results
+    
