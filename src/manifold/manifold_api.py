@@ -1,4 +1,3 @@
-import time
 from typing import List
 from urllib.parse import urlencode
 import requests
@@ -30,8 +29,8 @@ class ManifoldAPI:
     def call_api(
         self,
         endpoint: str,
-        params: dict = None,
-        payload: dict = None,
+        params: dict | None = None,
+        payload: dict | None = None,
         method: str = "GET",
     ) -> dict:
 

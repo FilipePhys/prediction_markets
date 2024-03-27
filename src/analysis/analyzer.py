@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import settings
 from futuur.futuur_api import FutuurAPI
 from manifold.manifold_api import ManifoldAPI
-from scipy.spatial.distance import cosine
 
 
 @dataclass
@@ -84,7 +83,7 @@ class Analizer:
         try:
             with open(abs_path, "r") as file:
                 data = json.load(file)
-        except:
+        except FileNotFoundError:
             return [MatchingMarket("", 133793, "Z9uy9T4q4rAfq4sGzPA0")]
 
         # Iterate over each object in the JSON array
