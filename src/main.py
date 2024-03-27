@@ -14,12 +14,5 @@ if __name__ == "__main__":
         manifold_api.get_all_markets()
         futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
         futuur_api.get_all_markets()
-        
-        
 
     analyze()
-
-
-    # TODO:
-    # 1) clean up the code. Clean code practices and ready PR.
-    # 2) display arbitrage oportunities for each matching market
