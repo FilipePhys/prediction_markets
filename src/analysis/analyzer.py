@@ -18,6 +18,7 @@ class MatchingOutcome:
 
 @dataclass
 class MatchingMarket:
+    futuur_title: str
     futuur_id: int
     manifold_id: str
     total_probability: float = 1
@@ -40,6 +41,7 @@ class Analizer:
 
         for market in matching_markets:
             futuur_market = self.futuur_api.get_market(market.futuur_id)
+            market.futuur_title = futuur_market.get("title")
             mani_market = self.manifold_api.get_market_by_id(market.manifold_id)
 
             if mani_market.get("outcomeType") == "BINARY":
@@ -83,16 +85,17 @@ class Analizer:
             with open(abs_path, "r") as file:
                 data = json.load(file)
         except:
-            return [MatchingMarket(133793, "Z9uy9T4q4rAfq4sGzPA0")]
+            return [MatchingMarket("", 133793, "Z9uy9T4q4rAfq4sGzPA0")]
 
         # Iterate over each object in the JSON array
         for obj in data:
-            markets.append(MatchingMarket(obj.get("futuur"), obj.get("mani")))
+            markets.append(MatchingMarket("", obj.get("futuur"), obj.get("mani")))
 
         return markets
 
     def display_arbitrage(self):
         for market in self.matching_markets:
+            print("\n\nMarket: " + market.futuur_title)
             if market.total_probability < 1:
                 for outcome in market.outcomes:
                     where_bet = (
@@ -104,6 +107,7 @@ class Analizer:
                         outcome.manifold_probability, outcome.futuur_probability
                     )
                     optimal_bet_amount = smaller_probability / market.total_probability
+
                     print(
                         "Bet on",
                         where_bet,
