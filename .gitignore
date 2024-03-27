@@ -2,3 +2,6 @@
 .idea/
 .venv
 __pycache__
+data.json
+mani_data.json
+futuur_data.json

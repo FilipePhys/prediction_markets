@@ -35,3 +35,7 @@ Holds the service that is responsible for interacting with the Manifold API.
 ## /analysis
 
 Has a proof of concept script that interacts with the API services. As a first step the matching bets will be hardcoded or manually saved on a file. In the future there can be a discovery service responsible for browsing the different markets and finding matching bets
+
+Usage:
+
+cd to the src folder `cd src`, and run main.py `python main.py`. We store open markets locally on a JSON, as to not have to fetch data every single time. We have a command line argument `-U` that tells the software to fetch and update markets. You will want to run `python main.py -U` the first time you run the program, and every time when you want to update the data. Probably every few days or so.

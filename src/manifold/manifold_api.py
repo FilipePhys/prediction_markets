@@ -5,12 +5,18 @@ import requests
 import json
 class ManifoldAPI:
     """
-    A class for interacting with the Manifold API.
+    A class for interacting with the Manifold API. It is implemented as a singleton, so we only ever have one instance of the class.
 
     Attributes:
         base_url (str): The base URL for the API endpoints.
 
     """
+    _instance = None
+    
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls, *args, **kwargs)
+        return cls._instance
 
     def __init__(self):
         """

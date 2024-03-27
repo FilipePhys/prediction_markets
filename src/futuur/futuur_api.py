@@ -12,7 +12,7 @@ import requests
 
 class FutuurAPI:
     """
-    A class for interacting with the Futuur API.
+    A class for interacting with the Futuur API. It is implemented as a singleton, so we only ever have one instance of the class.
 
     Attributes:
         PUBLIC_KEY (str): The public API key for authentication.
@@ -26,6 +26,13 @@ class FutuurAPI:
         call_api(endpoint: str, params: dict) -> dict: Makes a GET request to the API endpoint.
 
     """
+
+    _instance = None
+    
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self, key=None, secret=None):
         """
@@ -360,8 +367,9 @@ class FutuurAPI:
             time.sleep(1)
             print(response.get('pagination'))
             print(results[-1].get('id'))
-        
+
+        sorted_markets = sorted(results, key=lambda x: x['volume_real_money'], reverse=True)
         with open('futuur_data.json', 'w', encoding='utf-8') as f:
-            json.dump(results, f, ensure_ascii=False, indent=4)
-        return results
+            json.dump(sorted_markets, f, ensure_ascii=False, indent=4)
+        return sorted_markets
     
