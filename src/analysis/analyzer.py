@@ -1,3 +1,5 @@
+import json
+import os
 from typing import List
 from dataclasses import dataclass, field
 
@@ -22,10 +24,6 @@ class MatchingMarket:
     outcomes: List[MatchingOutcome] = field(default_factory=list)
 
 
-# TODO extract this to a json or other type of file to edit out manually
-matching_markets = [MatchingMarket(133793, "Z9uy9T4q4rAfq4sGzPA0")]
-
-
 class Analizer:
     def __init__(self):
         """
@@ -38,17 +36,26 @@ class Analizer:
         self.matching_markets = self.retrieve_matching_markets_outcomes()
 
     def retrieve_matching_markets_outcomes(self):
+        matching_markets = self.load_markets_from_json()
+
         for market in matching_markets:
             futuur_market = self.futuur_api.get_market(market.futuur_id)
             mani_market = self.manifold_api.get_market_by_id(market.manifold_id)
 
-            mani_awnsers = mani_market.get("answers")
+            if mani_market.get("outcomeType") == "BINARY":
+                mani_awnsers = [
+                    {"text": "yes", "probability": mani_market.get("probability")},
+                    {"text": "no", "probability": 1 - mani_market.get("probability")},
+                ]
+            else:
+                mani_awnsers = mani_market.get("answers")
             futuur_outcomes = futuur_market.get("outcomes")
             total_probability = 0
             for m in mani_awnsers:
+
                 matches = False
                 for o in futuur_outcomes:
-                    if m.get("text") == o.get("title"):
+                    if m.get("text").lower().strip() == o.get("title").lower().strip():
                         probability_mani = m["probability"]
                         probability_futuur = o["price"][
                             "OOM"
@@ -67,6 +74,22 @@ class Analizer:
             market.total_probability = total_probability
 
         return matching_markets
+
+    def load_markets_from_json(self, path="markets.json"):
+        markets = []
+        # Load the JSON file
+        abs_path = os.path.abspath(path)
+        try:
+            with open(abs_path, "r") as file:
+                data = json.load(file)
+        except:
+            return [MatchingMarket(133793, "Z9uy9T4q4rAfq4sGzPA0")]
+
+        # Iterate over each object in the JSON array
+        for obj in data:
+            markets.append(MatchingMarket(obj.get("futuur"), obj.get("mani")))
+
+        return markets
 
     def display_arbitrage(self):
         for market in self.matching_markets:
