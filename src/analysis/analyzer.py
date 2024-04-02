@@ -35,7 +35,7 @@ class Analizer:
         )
         self.matching_markets = self.retrieve_matching_markets_outcomes()
 
-    def retrieve_matching_markets_outcomes(self):
+    def retrieve_matching_markets_outcomes(self, currency="OOM"):
         matching_markets = self.load_markets_from_json()
 
         for market in matching_markets:
@@ -58,9 +58,7 @@ class Analizer:
                 for o in futuur_outcomes:
                     if m.get("text").lower().strip() == o.get("title").lower().strip():
                         probability_mani = m["probability"]
-                        probability_futuur = o["price"][
-                            "OOM"
-                        ]  # Assuming OOM odds are used
+                        probability_futuur = o["price"][currency]
                         smaller_probability = min(probability_mani, probability_futuur)
                         total_probability += smaller_probability
                         matches = True
