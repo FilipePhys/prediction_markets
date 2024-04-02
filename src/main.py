@@ -1,4 +1,5 @@
 from analysis.markets_analysis import analyze
+from matcher.matcher import Matcher
 import sys
 
 import settings
@@ -14,4 +15,7 @@ if __name__ == "__main__":
         futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
         futuur_api.get_all_markets()
 
-    analyze()
+    # analyze()
+
+    matcher = Matcher()
+    matcher.navigate_futuur()

@@ -76,17 +76,27 @@ class Analizer:
 
     def load_markets_from_json(self, path="markets.json"):
         markets = []
-        # Load the JSON file
         abs_path = os.path.abspath(path)
         try:
             with open(abs_path, "r") as file:
                 data = json.load(file)
         except FileNotFoundError:
-            return [MatchingMarket("", 133793, "Z9uy9T4q4rAfq4sGzPA0")]
+            return [
+                MatchingMarket(
+                    futuur_title="",
+                    futuur_id=133793,
+                    manifold_id="Z9uy9T4q4rAfq4sGzPA0",
+                )
+            ]
 
-        # Iterate over each object in the JSON array
         for obj in data:
-            markets.append(MatchingMarket("", obj.get("futuur"), obj.get("mani")))
+            markets.append(
+                MatchingMarket(
+                    futuur_title="",
+                    futuur_id=obj.get("futuur"),
+                    manifold_id=obj.get("mani"),
+                )
+            )
 
         return markets
 

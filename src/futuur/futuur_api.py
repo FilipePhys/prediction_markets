@@ -189,6 +189,7 @@ class FutuurAPI:
             for k, v in locals().items()
             if v is not None and v != "" and k != "self"
         }
+        # TODO format return into a proper dataclass market object or something
         return self.call_api("markets/", params=params, method="GET")
 
     def get_market(self, market_id=43598):
@@ -385,24 +386,22 @@ class FutuurAPI:
         """
         return self.call_api("bets/rates/", method="GET")
 
-    def get_all_markets(self):
+    def get_all_markets(self, category=None):
 
         # params = {'offset': offset}
-        response = self.get_markets()
+        response = self.get_markets(category=category)
 
         results: List = response.get("results")
         offset = response.get("pagination").get("page_size")
 
         next = response.get("pagination").get("next")
         while next:
-            response = self.get_markets(offset=offset)
+            response = self.get_markets(offset=offset, category=category)
             results.extend(response.get("results"))
 
             next = response.get("pagination").get("next")
             offset += response.get("pagination").get("page_size")
             time.sleep(1)
-            print(response.get("pagination"))
-            print(results[-1].get("id"))
 
         sorted_markets = sorted(
             results, key=lambda x: x["volume_real_money"], reverse=True
