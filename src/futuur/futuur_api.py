@@ -2,6 +2,9 @@ import datetime
 import hashlib
 import hmac
 from collections import OrderedDict
+import json
+import time
+from typing import List
 from urllib.parse import urlencode
 
 import requests
@@ -9,7 +12,7 @@ import requests
 
 class FutuurAPI:
     """
-    A class for interacting with the Futuur API.
+    A class for interacting with the Futuur API. It is implemented as a singleton, so we only ever have one instance of the class.
 
     Attributes:
         PUBLIC_KEY (str): The public API key for authentication.
@@ -24,6 +27,13 @@ class FutuurAPI:
 
     """
 
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(self, key=None, secret=None):
         """
         Initializes the FutuurAPI instance.
@@ -32,7 +42,7 @@ class FutuurAPI:
             key (str): The public key for authentication.
             secret (str): The private key for authentication.
         """
-        self.base_url = 'https://api.futuur.com/api/v1/'
+        self.base_url = "https://api.futuur.com/api/v1/"
         self.PUBLIC_KEY = key
         self.PRIVATE_KEY = secret
 
@@ -48,24 +58,26 @@ class FutuurAPI:
 
         """
         if params:
-            params['Key'] = self.PUBLIC_KEY
-            params['Timestamp'] = int(datetime.datetime.now().timestamp())
+            params["Key"] = self.PUBLIC_KEY
+            params["Timestamp"] = int(datetime.datetime.now().timestamp())
         else:
             params = {
-                'Key': self.PUBLIC_KEY,
-                'Timestamp': int(datetime.datetime.now().timestamp())
+                "Key": self.PUBLIC_KEY,
+                "Timestamp": int(datetime.datetime.now().timestamp()),
             }
         # Sort the parameters in lexicographic (alphabetical) order by parameter name.
         params_to_sign = OrderedDict(sorted(list(params.items())))
         # Use urlencode to generate the URL-encoded query string of the parameters.
         params_to_sign = urlencode(params_to_sign)
         # Convert the parameters and PRIVATE_KEY into byte-strings, as required by hmac.new
-        encoded_params = params_to_sign.encode('utf-8')
-        encoded_private_key = self.PRIVATE_KEY.encode('utf-8')
+        encoded_params = params_to_sign.encode("utf-8")
+        encoded_private_key = self.PRIVATE_KEY.encode("utf-8")
         # Compute the HMAC using SHA-512 and convert the result into a hexadecimal string
         return {
-            'hmac': hmac.new(encoded_private_key, encoded_params, hashlib.sha512).hexdigest(),
-            'Timestamp': params['Timestamp']
+            "hmac": hmac.new(
+                encoded_private_key, encoded_params, hashlib.sha512
+            ).hexdigest(),
+            "Timestamp": params["Timestamp"],
         }
 
     def build_headers(self, params: dict) -> dict:
@@ -81,13 +93,21 @@ class FutuurAPI:
         """
         signature = self.build_signature(params)
         headers = {
-            'Key': self.PUBLIC_KEY,
-            'Timestamp': str(signature.get('Timestamp')),  # API might expect this as a string
-            'HMAC': signature.get('hmac')
+            "Key": self.PUBLIC_KEY,
+            "Timestamp": str(
+                signature.get("Timestamp")
+            ),  # API might expect this as a string
+            "HMAC": signature.get("hmac"),
         }
         return headers
 
-    def call_api(self, endpoint: str, params: dict = None, payload: dict = None, method: str = 'GET') -> dict:
+    def call_api(
+        self,
+        endpoint: str,
+        params: dict = None,
+        payload: dict = None,
+        method: str = "GET",
+    ) -> dict:
         """
         Makes a request to the API endpoint.
 
@@ -102,20 +122,20 @@ class FutuurAPI:
 
         """
         # Encode the parameters into a URL-encoded query string without the Timestamp and HMAC parameters
-        url_params = '?' + urlencode(params) if params else ''
+        url_params = "?" + urlencode(params) if params else ""
         # Build headers for the request
         headers = self.build_headers(params or payload)
         # Build the full URL for the request
         url = self.base_url + endpoint + url_params
 
         request_kwargs = {
-            'method': method,
-            'url': url,
-            'headers': headers,
+            "method": method,
+            "url": url,
+            "headers": headers,
         }
-        if method.upper() == 'POST' and payload is not None:
+        if method.upper() == "POST" and payload is not None:
             # For POST requests, include the payload as JSON in the body of the request
-            request_kwargs['json'] = payload
+            request_kwargs["json"] = payload
 
         response = requests.request(**request_kwargs)
         try:
@@ -124,12 +144,22 @@ class FutuurAPI:
             response = {
                 "error": "Failed to parse JSON response",
                 "status_code": response.status_code,
-                "response": response.text
+                "response": response.text,
             }
             return response
 
-    def get_markets(self, limit=40, offset=0, currency_mode="play_money", ordering="relevance",  hide_my_bets=True,
-                live=None, resolved_only=False, category=None, tag=None):
+    def get_markets(
+        self,
+        limit=40,
+        offset=0,
+        currency_mode="play_money",
+        ordering="relevance",
+        hide_my_bets=True,
+        live=None,
+        resolved_only=False,
+        category=None,
+        tag=None,
+    ):
         """
         Fetches the list of markets available on the Futuur platform.
 
@@ -154,8 +184,13 @@ class FutuurAPI:
                 'o' -> open, 's' -> stopped, 'c' -> closed (resolved), 'x' -> cancelled, 'r' -> reversed (outcome result changed).
             - Authorization via HMAC is required to access this API endpoint.
         """
-        params = {k: v for k, v in locals().items() if v is not None and v != '' and k != 'self'}
-        return self.call_api('markets/', params=params, method='GET')
+        params = {
+            k: v
+            for k, v in locals().items()
+            if v is not None and v != "" and k != "self"
+        }
+        # TODO format return into a proper dataclass market object or something
+        return self.call_api("markets/", params=params, method="GET")
 
     def get_market(self, market_id=43598):
         """
@@ -170,7 +205,7 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'markets/{market_id}/', method='GET')
+        return self.call_api(f"markets/{market_id}/", method="GET")
 
     def get_related_markets(self, market_id):
         """
@@ -185,7 +220,7 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'markets/{market_id}/related_markets/', method='GET')
+        return self.call_api(f"markets/{market_id}/related_markets/", method="GET")
 
     def follow_market(self, market_id):
         """
@@ -200,7 +235,7 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'markets/{market_id}/follow/', method='POST')
+        return self.call_api(f"markets/{market_id}/follow/", method="POST")
 
     def unfollow_market(self, market_id):
         """
@@ -215,9 +250,9 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'markets/{market_id}/unfollow/', method='POST')
+        return self.call_api(f"markets/{market_id}/unfollow/", method="POST")
 
-    def post_comment(self, market_id, comment='Fascinating market!'):
+    def post_comment(self, market_id, comment="Fascinating market!"):
         """
         Post a comment on a market.
 
@@ -231,11 +266,22 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        payload = {'comment': comment}
-        return self.call_api(f'markets/{market_id}/comments/', payload=payload, method='POST')
+        payload = {"comment": comment}
+        return self.call_api(
+            f"markets/{market_id}/comments/", payload=payload, method="POST"
+        )
 
-    def get_betting_list(self, active=None, currency_mode="play_money", following=None, limit=40, offset=0,
-                     past_bets=None, question=None, user=None):
+    def get_betting_list(
+        self,
+        active=None,
+        currency_mode="play_money",
+        following=None,
+        limit=40,
+        offset=0,
+        past_bets=None,
+        question=None,
+        user=None,
+    ):
         """
         Fetches a list of bets based on the specified filters.
 
@@ -257,8 +303,8 @@ class FutuurAPI:
                 'l' -> lost, 'p' -> purchased, 's' -> sold, 'w' -> won, 'x' -> cancelled, 'd' -> disabled.
             - Authorization via HMAC is required to access this API endpoint.
         """
-        params = {k: v for k, v in locals().items() if v is not None and k != 'self'}
-        return self.call_api('bets/', params=params, method='GET')
+        params = {k: v for k, v in locals().items() if v is not None and k != "self"}
+        return self.call_api("bets/", params=params, method="GET")
 
     def get_betting(self, bet_id):
         """
@@ -273,7 +319,7 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'bets/{bet_id}/', method='GET')
+        return self.call_api(f"bets/{bet_id}/", method="GET")
 
     def sell(self, bet_id):
         """
@@ -288,9 +334,9 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api(f'bets/{bet_id}/', method='PATCH')
+        return self.call_api(f"bets/{bet_id}/", method="PATCH")
 
-    def simulate_purchase(self, shares, outcome_id, currency='OOM', amount=None):
+    def simulate_purchase(self, shares, outcome_id, currency="OOM", amount=None):
         """
         Simulates the purchase of a bet.
 
@@ -306,10 +352,10 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        params = {k: v for k, v in locals().items() if v is not None and k != 'self'}
-        return self.call_api('bets/simulate_purchase/', params=params, method='GET')
+        params = {k: v for k, v in locals().items() if v is not None and k != "self"}
+        return self.call_api("bets/simulate_purchase/", params=params, method="GET")
 
-    def purchase(self, shares, outcome_id, currency='OOM', amount=None):
+    def purchase(self, shares, outcome_id, currency="OOM", amount=None):
         """
         Purchases a bet.
 
@@ -325,8 +371,8 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        payload = {k: v for k, v in locals().items() if v is not None and k != 'self'}
-        return self.call_api('bets/', payload=payload, method='POST')
+        payload = {k: v for k, v in locals().items() if v is not None and k != "self"}
+        return self.call_api("bets/", payload=payload, method="POST")
 
     def get_rates(self):
         """
@@ -338,4 +384,28 @@ class FutuurAPI:
         Notes:
             - Authorization via HMAC is required to access this API endpoint.
         """
-        return self.call_api('bets/rates/', method='GET')
+        return self.call_api("bets/rates/", method="GET")
+
+    def get_all_markets(self, category=None):
+
+        # params = {'offset': offset}
+        response = self.get_markets(category=category)
+
+        results: List = response.get("results")
+        offset = response.get("pagination").get("page_size")
+
+        next = response.get("pagination").get("next")
+        while next:
+            response = self.get_markets(offset=offset, category=category)
+            results.extend(response.get("results"))
+
+            next = response.get("pagination").get("next")
+            offset += response.get("pagination").get("page_size")
+            time.sleep(1)
+
+        sorted_markets = sorted(
+            results, key=lambda x: x["volume_real_money"], reverse=True
+        )
+        with open("futuur_data.json", "w", encoding="utf-8") as f:
+            json.dump(sorted_markets, f, ensure_ascii=False, indent=4)
+        return sorted_markets
