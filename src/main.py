@@ -1,23 +1,182 @@
+import time
 from analysis.markets_analysis import analyze
 from matcher.matcher import Matcher
-import sys
+import re
+import os
 
 import settings
 from futuur.futuur_api import FutuurAPI
 from polymarket.polymarket_api import PolymarketAPI
+from py_clob_client.client import ClobClient
+import requests
+import json
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+def load_markets():
+    abs_path = os.path.abspath("markets.json")
+
+    try:
+        with open(abs_path, "r") as file:
+            data = json.load(file)
+            return data
+
+    except FileNotFoundError:
+        try:
+            abs_path = os.path.abspath("src/markets.json")
+            with open(abs_path, "r") as file:
+                data = json.load(file)
+                return data
+
+        except FileNotFoundError:
+
+            return None
+
+
+# FOCUSING MOSTLY ON YESSES AND NOs ATM
+def run_main():
+
+    # TODO
+    # 1. Put futuur URLs and maifold URLs on markets.json
+    # 2. Iterate all URLs and get the markets
+    # 3. for reach polyfold market try and get matching outcome with futuur based on a diff algorithm or something.
+
+    poli_client = ClobClient(
+        settings.POLYMARKET_HOST,
+        key=settings.POLYMARKET_KEY,
+        chain_id=settings.POLYMARKET_CHAIN_ID,
+    )
+
+    data = load_markets()
+    print(data)
+    poly_url_list = [item["poly"] for item in data]
+
+    print(poly_url_list)
+
+    # PART 1: Iterate all URLs and get the markets
+
+    poly_url_condition_dict = {}
+
+    for url in poly_url_list:
+        try:
+            res_poli = requests.request(method="GET", url=url)
+            matches = re.findall(
+                r'"conditionId":"(0x[a-fA-F0-9]{64})', res_poli.text, re.DOTALL
+            )
+            poly_url_condition_dict[url] = matches
+        except:
+            continue
+        print("Sleeping, url: ", url)
+        time.sleep(1)
+
+    print(poly_url_condition_dict)
+
+    poly_url_markets_dict = {}
+
+    # As of now we're only supporting poly simple markets. Some are more complicated, the ones with many choices. We're focusing on A or B type of bets. In the future we can have some code that identifies which is which and loops over multiple condition IDs if that's the case
+    for url, conditions in poly_url_condition_dict.items():
+        poly_url_markets_dict[url] = []
+        for condition in conditions:
+            res = poli_client.get_market(condition_id=condition)
+            poly_url_markets_dict[url] = res
+            print("Sleeping, cond: ", condition)
+            time.sleep(1)
+            break
+
+    print(poly_url_markets_dict)
+
+    futuur_payload_to_poly_conditions = []
+
+    futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
+
+    for url, markets in poly_url_markets_dict.items():
+        # Search through the list of dictionaries for a matching "mani"
+        for item in data:
+            if item["poly"] == url:
+                # TODO grab futuur market data
+
+                res = futuur_api.get_market(item["futuur"])
+
+                futuur_payload_to_poly_conditions.append((res, markets))
+
+                print("Sleeping, item['futuur']: ", item["futuur"])
+                time.sleep(1)
+
+    # Here in futuur_payload_to_poly_conditions, what we end up with is a futuur market matched to the poly-market outcomes
+    print("\n\n\n\n FINAL: ", futuur_payload_to_poly_conditions)
+
+    print("\n\n\n\n FINAL[0] NAME: ", futuur_payload_to_poly_conditions)
+
+    futuur_outcomes_to_poly_outcomes = []
+
+    vectorizer = TfidfVectorizer()
+    for match in futuur_payload_to_poly_conditions:
+        futuur_match = match[0]
+        poly_match = match[1]
+
+        futuur_outcomes = futuur_match.get("outcomes")
+        poly_tokens = poly_match.get("tokens")
+
+        print("\n\n\n\n futuur_outcomes: ", futuur_outcomes)
+        print("\n\n\n\n FINAL[0] NAME: ", poly_tokens)
+        futuur_outcome_to_poly_outcome = []
+        for futuur_outcome in futuur_outcomes:
+            print("futuur_outcome: ", futuur_outcome)
+            poly_outcomes = [token.get("outcome") for token in poly_tokens]
+
+            # Create a TF-IDF Vectorizer
+            vectorizer = TfidfVectorizer()
+
+            # Combine the target string with the list of strings to compare
+            texts = [futuur_outcome.get("title")] + poly_outcomes
+
+            # Transform strings into TF-IDF vectors
+            tfidf_matrix = vectorizer.fit_transform(texts)
+
+            # Compute cosine similarity (comparing 'a' with each string in 'b')
+            similarity_scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
+
+            # Find the index of the most similar string in the list 'b'
+            most_similar_index = similarity_scores[0].argmax()
+            print(
+                f"The string most similar to '{futuur_outcome.get('title')}' is '{poly_outcomes[most_similar_index]}' at index {most_similar_index} with a cosine similarity score of {similarity_scores[0, most_similar_index]}."
+            )
+
+            # ignore low similary. <0.1
+            if similarity_scores[0, most_similar_index] > 0.1:
+                for token in poly_tokens:
+                    if token.get("outcome") == poly_outcomes[most_similar_index]:
+                        futuur_outcome_to_poly_outcome.append((futuur_outcome, token))
+            else:
+                futuur_outcome_to_poly_outcome.append((futuur_outcome, {}))
+
+            print("@@futuur_outcome_to_poly_outcome: ", futuur_outcome_to_poly_outcome)
+        futuur_outcomes_to_poly_outcomes.append(futuur_outcome_to_poly_outcome)
+
+    # We need a step to check if the combined probability of the 'ignored' outcomes is small (let's say, lower than the possible arbitrage diff.)
+
+    print("MATCHED OUTCOMES BY THE END: ", futuur_outcomes_to_poly_outcomes)
+
+    for fut_to_poly in futuur_outcomes_to_poly_outcomes:
+        agg_price = 0
+        for single_outcome_match in fut_to_poly:
+            fut = single_outcome_match[0]
+            poly = single_outcome_match[1]
+
+            agg_price += min(fut.get("price").get("BTC") or 1, poly.get("price") or 1)
+
+        # AGG price
+        print("fut_to_poly: ", fut_to_poly)
+        print("AGG: ", agg_price)
+
+    # TODO now that we have the agg price we need to iterate and hit the APIs to determine if we can make money or not. Simulate 1 dollar, then doubling. 1, 2, 4, 8....
+    # TODO lastly we need to check current active bets to see if we're under the threshold to actually bet.
+
+    # requests.request(
+    #         method="GET", url=endpoint, headers=headers, json=data if data else None
+    #     )
+
 
 if __name__ == "__main__":
-
-    args = sys.argv[1:]
-    if "-U" in args:
-        futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
-        futuur_api.get_all_markets()
-
-    poly_api = PolymarketAPI(
-        settings.POLYMARKET_HOST, settings.POLYMARKET_KEY, settings.POLYMARKET_CHAIN_ID
-    )
-    poly_api.get_all_markets()
-
-    # analyze()
-
-    # matcher = Matcher()
+    run_main()
