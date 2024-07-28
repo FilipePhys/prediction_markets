@@ -1,4 +1,6 @@
+from dataclasses import dataclass
 import time
+from typing import List
 from analysis.markets_analysis import analyze
 from matcher.matcher import Matcher
 import re
@@ -34,6 +36,30 @@ def load_markets():
             return None
 
 
+@dataclass
+class PolyUrlToConditionIds:
+    url: str
+    condition_ids: List[str]
+
+
+@dataclass
+class PolyUrlToMarkets:
+    url: str
+    market: dict  # TODO type this out properly
+
+
+@dataclass
+class FutuurPayloadToPolyConditions:
+    futuur_payload: dict
+    poly_markets: dict
+
+
+@dataclass
+class FutuurOutcomesToPolyOutcomes:
+    futuur_outcomes: list[dict]
+    poly_outcomes: list[dict]
+
+
 # FOCUSING MOSTLY ON YESSES AND NOs ATM
 def run_main():
 
@@ -52,11 +78,9 @@ def run_main():
     print(data)
     poly_url_list = [item["poly"] for item in data]
 
-    print(poly_url_list)
-
     # PART 1: Iterate all URLs and get the markets
 
-    poly_url_condition_dict = {}
+    poly_url_conditions_list: List[PolyUrlToConditionIds] = []
 
     for url in poly_url_list:
         try:
@@ -64,49 +88,50 @@ def run_main():
             matches = re.findall(
                 r'"conditionId":"(0x[a-fA-F0-9]{64})', res_poli.text, re.DOTALL
             )
-            poly_url_condition_dict[url] = matches
+            poly_url_conditions_list.append(
+                PolyUrlToConditionIds(url=url, condition_ids=matches)
+            )
         except:
             continue
         print("Sleeping, url: ", url)
         time.sleep(1)
 
-    print(poly_url_condition_dict)
-
-    poly_url_markets_dict = {}
+    poly_url_market_list: List[PolyUrlToMarkets] = []
 
     # As of now we're only supporting poly simple markets. Some are more complicated, the ones with many choices. We're focusing on A or B type of bets. In the future we can have some code that identifies which is which and loops over multiple condition IDs if that's the case
-    for url, conditions in poly_url_condition_dict.items():
-        poly_url_markets_dict[url] = []
-        for condition in conditions:
+    for poly_url_conditions in poly_url_conditions_list:
+        for condition in poly_url_conditions.condition_ids:
             res = poli_client.get_market(condition_id=condition)
-            poly_url_markets_dict[url] = res
+            poly_url_market_list.append(
+                PolyUrlToMarkets(url=poly_url_conditions.url, market=res)
+            )
             print("Sleeping, cond: ", condition)
             time.sleep(1)
             break
 
-    print(poly_url_markets_dict)
-
-    futuur_payload_to_poly_conditions = []
+    futuur_payload_to_poly_conditions: List[FutuurPayloadToPolyConditions] = []
 
     futuur_api = FutuurAPI(settings.FUTUUR_PUBLIC_KEY, settings.FUTUUR_PRIVATE_KEY)
 
-    for url, markets in poly_url_markets_dict.items():
-        # Search through the list of dictionaries for a matching "mani"
-        for item in data:
-            if item["poly"] == url:
-                # TODO grab futuur market data
+    for poly_url_market in poly_url_market_list:
 
+        for item in data:
+            if item["poly"] == poly_url_market.url:
                 res = futuur_api.get_market(item["futuur"])
 
-                futuur_payload_to_poly_conditions.append((res, markets))
+                futuur_payload_to_poly_conditions.append(
+                    FutuurPayloadToPolyConditions(
+                        futuur_payload=res, poly_markets=poly_url_market.market
+                    )
+                )
 
-                print("Sleeping, item['futuur']: ", item["futuur"])
+                print("Sleeping, futuur_id: ", item["futuur"])
                 time.sleep(1)
 
     # Here in futuur_payload_to_poly_conditions, what we end up with is a futuur market matched to the poly-market outcomes
     print("\n\n\n\n FINAL: ", futuur_payload_to_poly_conditions)
 
-    print("\n\n\n\n FINAL[0] NAME: ", futuur_payload_to_poly_conditions)
+    quit()
 
     futuur_outcomes_to_poly_outcomes = []
 
@@ -169,6 +194,8 @@ def run_main():
         # AGG price
         print("fut_to_poly: ", fut_to_poly)
         print("AGG: ", agg_price)
+
+    limit = 50  # USDC
 
     # TODO now that we have the agg price we need to iterate and hit the APIs to determine if we can make money or not. Simulate 1 dollar, then doubling. 1, 2, 4, 8....
     # TODO lastly we need to check current active bets to see if we're under the threshold to actually bet.
