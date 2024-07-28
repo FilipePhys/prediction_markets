@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import time
-from typing import List
+from typing import List, Optional
 from analysis.markets_analysis import analyze
 from matcher.matcher import Matcher
 import re
@@ -55,9 +55,14 @@ class FutuurPayloadToPolyConditions:
 
 
 @dataclass
+class FutuurOutcomeToPolyOutcome:
+    futuur_outcome: Optional[list[dict]]
+    poly_outcome: Optional[list[dict]]
+
+
+@dataclass
 class FutuurOutcomesToPolyOutcomes:
-    futuur_outcomes: list[dict]
-    poly_outcomes: list[dict]
+    futuur_to_poly_outcomes: Optional[list[FutuurOutcomeToPolyOutcome]]
 
 
 # FOCUSING MOSTLY ON YESSES AND NOs ATM
@@ -128,12 +133,7 @@ def run_main():
                 print("Sleeping, futuur_id: ", item["futuur"])
                 time.sleep(1)
 
-    # Here in futuur_payload_to_poly_conditions, what we end up with is a futuur market matched to the poly-market outcomes
-    print("\n\n\n\n FINAL: ", futuur_payload_to_poly_conditions)
-
-    quit()
-
-    futuur_outcomes_to_poly_outcomes = []
+    futuur_outcomes_to_poly_outcomes: List[FutuurOutcomeToPolyOutcome] = []
 
     vectorizer = TfidfVectorizer()
     for match in futuur_payload_to_poly_conditions:
@@ -145,7 +145,7 @@ def run_main():
 
         print("\n\n\n\n futuur_outcomes: ", futuur_outcomes)
         print("\n\n\n\n FINAL[0] NAME: ", poly_tokens)
-        futuur_outcome_to_poly_outcome = []
+        futuur_outcome_to_poly_outcome = FutuurOutcomeToPolyOutcome()
         for futuur_outcome in futuur_outcomes:
             print("futuur_outcome: ", futuur_outcome)
             poly_outcomes = [token.get("outcome") for token in poly_tokens]
