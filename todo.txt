@@ -1,0 +1,5 @@
+- Forget matching, manually get the URLs or something, and arbitrage based on that.
+
+- Try to bet programatically and see results
+
+- Add manually and periodically check results
