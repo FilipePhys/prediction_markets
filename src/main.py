@@ -61,8 +61,14 @@ class FutuurOutcomeToPolyOutcome:
 
 
 @dataclass
-class FutuurOutcomesToPolyOutcomes:
+class FutuurToPolyMarket:
     futuur_to_poly_outcomes: Optional[list[FutuurOutcomeToPolyOutcome]]
+    # TODO include more info here, like agg amount bet, and etc.
+
+
+@dataclass
+class FutuurOutcomesToPolyOutcomes:
+    futuur_to_poly_markets: Optional[list[FutuurToPolyMarket]]
 
 
 # FOCUSING MOSTLY ON YESSES AND NOs ATM
@@ -133,19 +139,18 @@ def run_main():
                 print("Sleeping, futuur_id: ", item["futuur"])
                 time.sleep(1)
 
-    futuur_outcomes_to_poly_outcomes: List[FutuurOutcomeToPolyOutcome] = []
+    futuur_outcomes_to_poly_outcomes = FutuurOutcomesToPolyOutcomes(
+        futuur_to_poly_markets=[]
+    )
 
     vectorizer = TfidfVectorizer()
     for match in futuur_payload_to_poly_conditions:
-        futuur_match = match[0]
-        poly_match = match[1]
 
-        futuur_outcomes = futuur_match.get("outcomes")
-        poly_tokens = poly_match.get("tokens")
+        market = FutuurToPolyMarket(futuur_to_poly_outcomes=[])
 
-        print("\n\n\n\n futuur_outcomes: ", futuur_outcomes)
-        print("\n\n\n\n FINAL[0] NAME: ", poly_tokens)
-        futuur_outcome_to_poly_outcome = FutuurOutcomeToPolyOutcome()
+        futuur_outcomes = match.futuur_payload.get("outcomes")
+        poly_tokens = match.poly_markets.get("tokens")
+
         for futuur_outcome in futuur_outcomes:
             print("futuur_outcome: ", futuur_outcome)
             poly_outcomes = [token.get("outcome") for token in poly_tokens]
@@ -169,19 +174,23 @@ def run_main():
             )
 
             # ignore low similary. <0.1
+            poly_outcome = None
             if similarity_scores[0, most_similar_index] > 0.1:
                 for token in poly_tokens:
                     if token.get("outcome") == poly_outcomes[most_similar_index]:
-                        futuur_outcome_to_poly_outcome.append((futuur_outcome, token))
-            else:
-                futuur_outcome_to_poly_outcome.append((futuur_outcome, {}))
+                        poly_outcome = token
 
-            print("@@futuur_outcome_to_poly_outcome: ", futuur_outcome_to_poly_outcome)
-        futuur_outcomes_to_poly_outcomes.append(futuur_outcome_to_poly_outcome)
+            market.futuur_to_poly_outcomes.append(
+                FutuurOutcomeToPolyOutcome(
+                    futuur_outcome=futuur_outcome, poly_outcome=poly_outcome
+                )
+            )
+        futuur_outcomes_to_poly_outcomes.futuur_to_poly_markets.append(market)
 
     # We need a step to check if the combined probability of the 'ignored' outcomes is small (let's say, lower than the possible arbitrage diff.)
 
     print("MATCHED OUTCOMES BY THE END: ", futuur_outcomes_to_poly_outcomes)
+    quit()
 
     for fut_to_poly in futuur_outcomes_to_poly_outcomes:
         agg_price = 0
