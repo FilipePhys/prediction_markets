@@ -63,6 +63,8 @@ class FutuurOutcomeToPolyOutcome:
 @dataclass
 class FutuurToPolyMarket:
     futuur_to_poly_outcomes: Optional[list[FutuurOutcomeToPolyOutcome]]
+    agg_value: float = 0.0
+    futuur_question_id: int | None = None
     # TODO include more info here, like agg amount bet, and etc.
 
 
@@ -146,7 +148,10 @@ def run_main():
     vectorizer = TfidfVectorizer()
     for match in futuur_payload_to_poly_conditions:
 
-        market = FutuurToPolyMarket(futuur_to_poly_outcomes=[])
+        market = FutuurToPolyMarket(
+            futuur_to_poly_outcomes=[],
+            futuur_question_id=match.futuur_payload.get("id"),
+        )
 
         futuur_outcomes = match.futuur_payload.get("outcomes")
         poly_tokens = match.poly_markets.get("tokens")
@@ -169,12 +174,12 @@ def run_main():
 
             # Find the index of the most similar string in the list 'b'
             most_similar_index = similarity_scores[0].argmax()
-            print(
-                f"The string most similar to '{futuur_outcome.get('title')}' is '{poly_outcomes[most_similar_index]}' at index {most_similar_index} with a cosine similarity score of {similarity_scores[0, most_similar_index]}."
-            )
+            # print(
+            #     f"The string most similar to '{futuur_outcome.get('title')}' is '{poly_outcomes[most_similar_index]}' at index {most_similar_index} with a cosine similarity score of {similarity_scores[0, most_similar_index]}."
+            # )
 
             # ignore low similary. <0.1
-            poly_outcome = None
+            poly_outcome = {}
             if similarity_scores[0, most_similar_index] > 0.1:
                 for token in poly_tokens:
                     if token.get("outcome") == poly_outcomes[most_similar_index]:
@@ -187,24 +192,32 @@ def run_main():
             )
         futuur_outcomes_to_poly_outcomes.futuur_to_poly_markets.append(market)
 
-    # We need a step to check if the combined probability of the 'ignored' outcomes is small (let's say, lower than the possible arbitrage diff.)
+    for fut_to_poly in futuur_outcomes_to_poly_outcomes.futuur_to_poly_markets:
+        agg_value = 0
+        for single_outcome_match in fut_to_poly.futuur_to_poly_outcomes:
 
-    print("MATCHED OUTCOMES BY THE END: ", futuur_outcomes_to_poly_outcomes)
-    quit()
+            print("\nFUT: ", single_outcome_match.futuur_outcome.get("price"))
+            print("\nPOLY: ", single_outcome_match.poly_outcome.get("price"))
+            agg_value += min(
+                single_outcome_match.futuur_outcome.get("price").get("BTC") or 1,
+                single_outcome_match.poly_outcome.get("price") or 1,
+            )
 
-    for fut_to_poly in futuur_outcomes_to_poly_outcomes:
-        agg_price = 0
-        for single_outcome_match in fut_to_poly:
-            fut = single_outcome_match[0]
-            poly = single_outcome_match[1]
+        fut_to_poly.agg_value = agg_value
 
-            agg_price += min(fut.get("price").get("BTC") or 1, poly.get("price") or 1)
-
-        # AGG price
-        print("fut_to_poly: ", fut_to_poly)
-        print("AGG: ", agg_price)
+    # print("MATCHED OUTCOMES BY THE END: ", futuur_outcomes_to_poly_outcomes)
 
     limit = 50  # USDC
+
+    for fut_to_poly in futuur_outcomes_to_poly_outcomes.futuur_to_poly_markets:
+        amount_bet = 0.0
+        if fut_to_poly.agg_value < 0.97:
+            bets = futuur_api.get_betting_list(
+                active=True,
+                currency_mode="real_money",
+                question=fut_to_poly.futuur_question_id,
+            )
+            print("@bets: ", bets)
 
     # TODO now that we have the agg price we need to iterate and hit the APIs to determine if we can make money or not. Simulate 1 dollar, then doubling. 1, 2, 4, 8....
     # TODO lastly we need to check current active bets to see if we're under the threshold to actually bet.
