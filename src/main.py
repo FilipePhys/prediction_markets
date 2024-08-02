@@ -46,6 +46,7 @@ class PolyUrlToConditionIds:
 class PolyUrlToMarkets:
     url: str
     market: dict  # TODO type this out properly
+    condition_id: Optional[str] = None
 
 
 @dataclass
@@ -65,6 +66,7 @@ class FutuurToPolyMarket:
     futuur_to_poly_outcomes: Optional[list[FutuurOutcomeToPolyOutcome]]
     agg_value: float = 0.0
     futuur_question_id: int | None = None
+    agg_amount_bet_on_futuur: float = 0.0
     # TODO include more info here, like agg amount bet, and etc.
 
 
@@ -116,7 +118,9 @@ def run_main():
         for condition in poly_url_conditions.condition_ids:
             res = poli_client.get_market(condition_id=condition)
             poly_url_market_list.append(
-                PolyUrlToMarkets(url=poly_url_conditions.url, market=res)
+                PolyUrlToMarkets(
+                    url=poly_url_conditions.url, market=res, condition_id=condition
+                )
             )
             print("Sleeping, cond: ", condition)
             time.sleep(1)
@@ -140,6 +144,7 @@ def run_main():
 
                 print("Sleeping, futuur_id: ", item["futuur"])
                 time.sleep(1)
+    print("@@@@@@@poly_url_market_list: ", futuur_payload_to_poly_conditions)
 
     futuur_outcomes_to_poly_outcomes = FutuurOutcomesToPolyOutcomes(
         futuur_to_poly_markets=[]
@@ -155,9 +160,10 @@ def run_main():
 
         futuur_outcomes = match.futuur_payload.get("outcomes")
         poly_tokens = match.poly_markets.get("tokens")
+        print("@@match.poly_markets: ", match.poly_markets)
+        condition_id = match.poly_markets.get("condition_id")
 
         for futuur_outcome in futuur_outcomes:
-            print("futuur_outcome: ", futuur_outcome)
             poly_outcomes = [token.get("outcome") for token in poly_tokens]
 
             # Create a TF-IDF Vectorizer
@@ -183,7 +189,7 @@ def run_main():
             if similarity_scores[0, most_similar_index] > 0.1:
                 for token in poly_tokens:
                     if token.get("outcome") == poly_outcomes[most_similar_index]:
-                        poly_outcome = token
+                        poly_outcome = {"condition_id": condition_id, **token}
 
             market.futuur_to_poly_outcomes.append(
                 FutuurOutcomeToPolyOutcome(
@@ -196,8 +202,6 @@ def run_main():
         agg_value = 0
         for single_outcome_match in fut_to_poly.futuur_to_poly_outcomes:
 
-            print("\nFUT: ", single_outcome_match.futuur_outcome.get("price"))
-            print("\nPOLY: ", single_outcome_match.poly_outcome.get("price"))
             agg_value += min(
                 single_outcome_match.futuur_outcome.get("price").get("BTC") or 1,
                 single_outcome_match.poly_outcome.get("price") or 1,
@@ -208,16 +212,28 @@ def run_main():
     # print("MATCHED OUTCOMES BY THE END: ", futuur_outcomes_to_poly_outcomes)
 
     limit = 50  # USDC
+    print(futuur_outcomes_to_poly_outcomes)
 
     for fut_to_poly in futuur_outcomes_to_poly_outcomes.futuur_to_poly_markets:
-        amount_bet = 0.0
+        agg_amount_bet_on_futuur = 0.0
         if fut_to_poly.agg_value < 0.97:
-            bets = futuur_api.get_betting_list(
+            bets_response = futuur_api.get_betting_list(
                 active=True,
                 currency_mode="real_money",
                 question=fut_to_poly.futuur_question_id,
             )
-            print("@bets: ", bets)
+            for bet in bets_response.get("results"):
+                active_purchases = bet.get("active_purchases")
+                for active_pur in active_purchases:
+                    if active_pur.get("currency") == "USDC":
+                        agg_amount_bet_on_futuur += active_pur.get("amount")
+
+            # TODO do the same for condition id to update agg amount bet
+
+            fut_to_poly.agg_amount_bet_on_futuur = agg_amount_bet_on_futuur
+
+            # if currency == 'USDC':
+            #     print("@bet: ", bet)
 
     # TODO now that we have the agg price we need to iterate and hit the APIs to determine if we can make money or not. Simulate 1 dollar, then doubling. 1, 2, 4, 8....
     # TODO lastly we need to check current active bets to see if we're under the threshold to actually bet.
