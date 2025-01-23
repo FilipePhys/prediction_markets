@@ -48,7 +48,6 @@ class PolymarketAPI:
             count += 100
             response = self.client.get_markets(next_cursor=next_cursor)
             results.extend(response.get("data"))
-
             time.sleep(2)
 
         with open("poly_data.json", "w", encoding="utf-8") as f:
